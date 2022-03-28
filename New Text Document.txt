@@ -1,0 +1,137 @@
+import pandas as pd
+url = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv'
+df = pd.read_csv(url, error_bad_lines=False)
+
+#remove cols
+df = df.drop(columns = ['iso2', 'iso3', 'code3', 'FIPS', 'Country_Region', 'Combined_Key'])
+df = df.rename(columns={"Admin2": "County", 'Province_State':'State', 'Long_':'Long'})
+
+#MOST POPULOUS COUNTIES IN U.S. by contintental states
+lyst = []
+for x in df['State']:
+    df2 = df[(df['State'] == x)]
+    df3 = df2[(df2['Population'] == df2['Population'].max())]
+    uid = df3.iat[0,0]
+    lyst.append(uid)
+    
+    
+df = df[df['UID'].isin(lyst)]
+    
+
+df2 = df[(df['State'] == 'Kentucky')]
+max(df2['Population'])
+    
+#remove hawaii
+df = df[(df['State'] != 'Hawaii')]
+df = df.dropna()
+df = df.reset_index(drop = True)
+df
+
+#for one
+#Autuga
+#create empty df
+column_names = ["Date", "Deaths", "County", "State", "Lat", "Long", "Population"]
+data = pd.DataFrame(columns = column_names)
+
+
+#loop
+for x in df['UID']:
+    df2 = df[(df['UID'] == x)]
+    df2 = df2.drop(columns = ['UID'])
+
+
+    df2 = df2.T
+    #reset col names
+    df2.columns = range(df2.shape[1])
+
+    df2['County'] = df2.iloc[0,0]
+    df2['State'] = df2.iloc[1,0]
+    df2['Lat'] = df2.iloc[2,0]
+    df2['Long'] = df2.iloc[3,0]
+    df2['Population'] = df2.iloc[4,0]
+    
+    #outside loop
+    #remove top 4
+
+    df2 = df2.iloc[5:]
+
+    df2 = df2.reset_index()
+
+    #rename cols
+    df2 = df2.rename(columns={"index":"Date", 0:"Deaths"})
+    
+    df2['New Deaths'] = df2.Deaths.diff().fillna(0)
+    
+    data = data.append(df2, True)
+
+
+#change to date time
+data['Date'] = pd.to_datetime(data.Date)
+data['Date'] = data['Date'].dt.strftime('%m/%d/%Y')
+#round to 6dp
+data.Lat = data.Lat.round(decimals=6)
+data.Long = data.Long.round(decimals=6)
+data
+
+
+
+# weather----------------------------
+#import
+dfweather = pd.read_csv("weather.csv")
+
+#pick
+
+#rename
+dfweather = dfweather.rename(columns={"datetime":"Date"})
+
+#split
+dfsplit = dfweather['name'].str.split(',', expand=True)
+
+#drop name from
+dfweather = dfweather.drop(columns = ['name'])
+
+
+#rename split
+dfsplit = dfsplit.rename(columns={0:"Lat", 1:"Long"})
+
+
+#CONCAT
+dfw = pd.concat([dfsplit, dfweather], axis=1)
+
+#convert date
+dfw['Date'] = pd.to_datetime(dfw.Date)
+dfw['Date'] = dfw['Date'].dt.strftime('%m/%d/%Y')
+dfw['Date']=dfw['Date'].astype(object)
+
+#convert lat, long to floats
+dfw['Lat']=dfw['Lat'].astype(float)
+dfw['Long']=dfw['Long'].astype(float)
+
+
+#pcik cols
+dfw = dfw[['Lat', 'Long', 'Date', 'temp', 'humidity', 'windspeed', 'solarradiation']]
+
+#round
+dfw.Lat = dfw.Lat.round(decimals=6)
+dfw.Long = dfw.Long.round(decimals=6)
+
+
+dfw
+
+
+#join
+#dfnew = reduce(lambda left,right: pd.merge(left,right,on='GrowingSeason'), dfs)
+
+dfnew = pd.merge(data, dfw, on=['Lat', 'Long', 'Date'])
+
+
+
+#sort
+new_cols = ["Date","County","State","Population","Lat", 'Long', 'temp', 'humidity', 'windspeed', 'solarradiation', 'New Deaths','Deaths']
+dfnew=dfnew[new_cols]
+#or
+dfnew=dfnew.reindex(columns=new_cols)
+dfnew
+
+
+dfnew.to_csv(r'C:\Users\Mubby\OneDrive - University of Kentucky\DOCS\SPRING 2022\DS 711\Capstone python\covidweatherdeath.csv', index = False)
